@@ -1,0 +1,3 @@
+/out/*
+!/out/.keepfolder
+.ccls-cache/
