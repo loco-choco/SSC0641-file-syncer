@@ -13,5 +13,8 @@ int main(int argc, char **argv) {
   }
   char *ip = argv[1];
 
+  // TODO Create syncer_init thread
+  // TODO Create syncee_init thread
+
   return 0;
 }

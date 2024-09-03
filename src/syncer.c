@@ -69,6 +69,8 @@ void *syncer_init(SYNCER_ARGS *args) {
     // Create threads for each connecting client
     // TODO CREATE LIST OF CREATED THREADS AND THEN WAIT FOR THEM TO CLOSE WHEN
     // FREEING STUFF
+    // TODO CREATE syncer_receiver THREADS receving the socker
+    // TODO CREATE syncee from this IP
   }
 
   // Close listening socket
