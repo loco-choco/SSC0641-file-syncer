@@ -1,13 +1,11 @@
 #ifndef FILE_TABLE
 #define FILE_TABLE
 
-typedef struct file_table {
-  char* file;
-  struct file_table* next;
-} file_table;
+typedef struct FILE_TABLE {
+  char *file;
+  struct file_table *next;
+} FILE_TABLE;
 
-int get_files_in_dir(char* dir, file_table** files);
+int get_files_in_dir(char *dir, FILE_TABLE **files);
 
 #endif
-
-
