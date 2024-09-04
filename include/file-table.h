@@ -1,7 +1,7 @@
-#ifndef FILE_TABLE
-#define FILE_TABLE
+#ifndef FILE_TABLE_H
+#define FILE_TABLE_H
 
-typedef struct FILE_TABLE {
+typedef struct file_table {
   char *file;
   struct file_table *next;
 } FILE_TABLE;

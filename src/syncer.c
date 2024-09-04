@@ -1,7 +1,6 @@
 #include "syncer.h"
 #include "file-table.h"
 #include "message-definition.h"
-#include "thread-list.h"
 #include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -20,8 +19,14 @@ typedef int SOCKET;
 typedef struct syncer_receiver_args {
   SOCKET socket;
   FILE_TABLE *files;
+  pthread_mutex_t *files_mutex;
 } SYNCER_RECEIVER_ARGS;
 
+typedef struct thread_list {
+  pthread_t thread;
+  struct thread_list *next;
+} THREAD_LIST;
+#
 void *syncer_receiver(SYNCER_RECEIVER_ARGS *args);
 void send_file_table(SOCKET client, FILE_TABLE *files);
 void send_file_content(SOCKET client, char *file);
@@ -30,8 +35,12 @@ void *syncer_init(SYNCER_ARGS *args) {
   SOCKET listener;
   struct sockaddr_in addr;
   FILE_TABLE *files;
+  pthread_mutex_t files_mutex;
   THREAD_LIST *client_threads;
 
+  printf("Syncer thread created.\n");
+
+  printf("Creating Listener Socket.\n");
   // Create Listener Socket and Bind it to Port
   listener = socket(AF_INET, SOCK_STREAM, 0);
   if (listener < 0) {
@@ -57,14 +66,18 @@ void *syncer_init(SYNCER_ARGS *args) {
     pthread_exit(NULL);
   }
 
-  // Scan for Files in Folder and generate Files Table
+  printf("Scaning for files in dir '%s'.\n", args->dir);
+  // Scan for Files in Folder, generate Files Table, and create its mutex
   if (get_files_in_dir(args->dir, &files) != 0) {
     fprintf(stderr, "Wasn't able to generate files table for %s.\n", args->dir);
     free(args);
     pthread_exit(NULL);
   }
-  printf("Waiting for new conections.\n");
+  pthread_mutex_init(&files_mutex, NULL);
+  // Initialize the client_threads list
   client_threads = NULL;
+  // Wait for new conections
+  printf("Waiting for new conections.\n");
   while (1) {
     SOCKET client;
     struct sockaddr client_addr;
@@ -80,6 +93,7 @@ void *syncer_init(SYNCER_ARGS *args) {
     pthread_t client_thread;
     SYNCER_RECEIVER_ARGS *args = calloc(1, sizeof(SYNCER_RECEIVER_ARGS));
     args->files = files;
+    args->files_mutex = &files_mutex;
     args->socket = client;
     pthread_create(&client_thread, NULL, (void *)syncer_receiver, args);
     // Add new thread to list
@@ -112,12 +126,15 @@ void *syncer_init(SYNCER_ARGS *args) {
     free(files);
     files = next;
   }
+  pthread_mutex_destroy(&files_mutex);
   pthread_exit(NULL);
 }
 
 void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
+  printf("New syncer receiver thread.\n");
   SOCKET client = args->socket;
   FILE_TABLE *file_table = args->files;
+  pthread_mutex_t *files_mutex = args->files_mutex;
   int message_header;
   int received_amount;
   int connected = 0;
@@ -135,7 +152,10 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
     message_header = ntohl(received_header);
     if (message_header == FILE_TABLE_REQUEST) { // TABLE REQUEST
       // Send file table
+      // Locking it as file_table is shared, even if in "readonly" mode
+      pthread_mutex_lock(files_mutex);
       send_file_table(client, file_table);
+      pthread_mutex_unlock(files_mutex);
     } else if (message_header == FILE_CONTENT_REQUEST) { // FILE CONTENT REQUEST
       // Receive string size
       int32_t received_string_size;
@@ -187,6 +207,7 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
 // [ STRING_SEPARATOR STRING_SIZE STRING]*
 // MESSAGE_END
 void send_file_table(SOCKET client, FILE_TABLE *files) {
+  printf("Sending file table to client.\n");
   int32_t header = htonl(FILE_TABLE_REQUEST);
   char string_separator = FILE_TABLE_STRING_SEPARATOR;
   char message_end = FILE_TABLE_MESSAGE_END;
@@ -210,6 +231,7 @@ void send_file_table(SOCKET client, FILE_TABLE *files) {
 // FILE CONTENT
 // EOF
 void send_file_content(SOCKET client, char *file) {
+  printf("Sending contents of file '%s' to client.\n", file);
   char buffer[MAX_SENDING_BUFFER_SIZE];
   int32_t header = htonl(FILE_CONTENT_REQUEST);
   char message_end = FILE_CONTENT_MESSAGE_END;
@@ -217,11 +239,11 @@ void send_file_content(SOCKET client, char *file) {
   // Send Header
   send(client, &header, sizeof(header), MSG_MORE);
   // Send File
-  file_handler = fopen(file_name, "r");
+  file_handler = fopen(file, "r");
   if (file_handler != NULL) {
     size_t read_bytes;
-    while ((read_bytes = read(file_handler, buffer, MAX_SENDING_BUFFER_SIZE)) >
-           0) {
+    while ((read_bytes = fread(buffer, sizeof(char), MAX_SENDING_BUFFER_SIZE,
+                               file_handler)) > 0) {
       send(client, buffer, sizeof(char) * read_bytes, MSG_MORE);
     }
     fclose(file_handler);
