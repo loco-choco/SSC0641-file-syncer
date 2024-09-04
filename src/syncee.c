@@ -38,9 +38,10 @@ void *syncee_init(SYNCEE_ARGS *args) {
   }
   // Conect to server
   printf("Conecting to server in %s.\n", server_addr);
-  if (connect(client, (struct sockaddr *)&server_addr, sizeof(server_addr)) <
-      0) {
+  if (connect(client, (struct sockaddr *)&server_addr_in,
+              sizeof(server_addr_in)) < 0) {
     fprintf(stderr, "Wasn't able to connect to server in %s.\n", server_addr);
+    goto FREE_AND_EXIT;
   }
   int connected = 0;
 

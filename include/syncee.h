@@ -11,6 +11,7 @@ typedef struct syncee_thread_list {
 } SYNCEE_THREAD_LIST;
 
 typedef struct syncee_args {
+  int port;
   char *server_addr;
   int ip_type;
 } SYNCEE_ARGS;
