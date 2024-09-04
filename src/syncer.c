@@ -1,6 +1,7 @@
 #include "syncer.h"
 #include "file-table.h"
 #include "message-definition.h"
+#include "thread-list.h"
 #include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -11,12 +12,17 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-typedef int SOCKET;
-
 #define MAX_PENDING_CONECTIONS 10
 #define MAX_RECEIVER_BUFFER_SIZE 128
 #define MAX_SENDING_BUFFER_SIZE 1024
 
+typedef int SOCKET;
+typedef struct syncer_receiver_args {
+  SOCKET socket;
+  FILE_TABLE *files;
+} SYNCER_RECEIVER_ARGS;
+
+void *syncer_receiver(SYNCER_RECEIVER_ARGS *args);
 void send_file_table(SOCKET client, FILE_TABLE *files);
 void send_file_content(SOCKET client, char *file);
 
@@ -24,6 +30,7 @@ void *syncer_init(SYNCER_ARGS *args) {
   SOCKET listener;
   struct sockaddr_in addr;
   FILE_TABLE *files;
+  THREAD_LIST *client_threads;
 
   // Create Listener Socket and Bind it to Port
   listener = socket(AF_INET, SOCK_STREAM, 0);
@@ -56,6 +63,8 @@ void *syncer_init(SYNCER_ARGS *args) {
     free(args);
     pthread_exit(NULL);
   }
+  printf("Waiting for new conections.\n");
+  client_threads = NULL;
   while (1) {
     SOCKET client;
     struct sockaddr client_addr;
@@ -66,18 +75,34 @@ void *syncer_init(SYNCER_ARGS *args) {
       fprintf(stderr, "Accepting conection of client failed.\n");
       continue;
     }
-    // Create threads for each connecting client
-    // TODO CREATE LIST OF CREATED THREADS AND THEN WAIT FOR THEM TO CLOSE WHEN
-    // FREEING STUFF
-    // TODO CREATE syncer_receiver THREADS receving the socker
-    // TODO CREATE syncee from this IP
-  }
+    printf("New conection from %s.\n", client_addr.sa_data);
+    // Give new socket to client thread
+    pthread_t client_thread;
+    SYNCER_RECEIVER_ARGS *args = calloc(1, sizeof(SYNCER_RECEIVER_ARGS));
+    args->files = files;
+    args->socket = client;
+    pthread_create(&client_thread, NULL, (void *)syncer_receiver, args);
+    // Add new thread to list
+    THREAD_LIST *new = calloc(1, sizeof(THREAD_LIST));
+    new->thread = client_thread;
+    new->next = client_threads;
+    client_threads = new;
 
+    // TODO CREATE SYNCEE WITH NEW CLIENT
+  }
+  printf("Closing Listener Socket.\n");
   // Close listening socket
   if (close(listener) != 0) {
     fprintf(stderr, "Failed to close listener socket.\n");
   }
-
+  // Wait for client threads to finish, and free threads list
+  THREAD_LIST *next_client_thread;
+  while (client_threads != NULL) {
+    next_client_thread = client_threads->next;
+    pthread_join(client_threads->thread, NULL);
+    free(client_threads);
+    client_threads = next_client_thread;
+  }
   // Free and Exit
   free(args);
   FILE_TABLE *next;
@@ -147,6 +172,13 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
     }
   }
 
+  // Close client socket
+  if (close(client) != 0) {
+    fprintf(stderr, "Failed to close client socket.\n");
+  }
+  // Free and exit
+  free(args); // We dont need to release the file_table, as it is from
+              // syncer_init, not ours
   pthread_exit(NULL);
 }
 
@@ -156,12 +188,12 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
 // MESSAGE_END
 void send_file_table(SOCKET client, FILE_TABLE *files) {
   int32_t header = htonl(FILE_TABLE_REQUEST);
-  char string_separator = '|';
-  char message_end = '.';
+  char string_separator = FILE_TABLE_STRING_SEPARATOR;
+  char message_end = FILE_TABLE_MESSAGE_END;
   FILE_TABLE *pointer;
   // Send Header
   send(client, &header, sizeof(header), MSG_MORE);
-  // Send Files
+  // Send File Names
   pointer = files;
   while (pointer != NULL) {
     int32_t file_name_size = htonl(strlen(pointer->file));
@@ -180,7 +212,7 @@ void send_file_table(SOCKET client, FILE_TABLE *files) {
 void send_file_content(SOCKET client, char *file) {
   char buffer[MAX_SENDING_BUFFER_SIZE];
   int32_t header = htonl(FILE_CONTENT_REQUEST);
-  char message_end = EOF;
+  char message_end = FILE_CONTENT_MESSAGE_END;
   FILE *file_handler;
   // Send Header
   send(client, &header, sizeof(header), MSG_MORE);
