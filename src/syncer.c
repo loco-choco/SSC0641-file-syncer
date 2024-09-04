@@ -26,7 +26,7 @@ typedef struct thread_list {
   pthread_t thread;
   struct thread_list *next;
 } THREAD_LIST;
-#
+
 void *syncer_receiver(SYNCER_RECEIVER_ARGS *args);
 void send_file_table(SOCKET client, FILE_TABLE *files);
 void send_file_content(SOCKET client, char *file);
@@ -131,10 +131,12 @@ void *syncer_init(SYNCER_ARGS *args) {
 }
 
 void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
-  printf("New syncer receiver thread.\n");
   SOCKET client = args->socket;
   FILE_TABLE *file_table = args->files;
   pthread_mutex_t *files_mutex = args->files_mutex;
+
+  printf("New syncer receiver thread.\n");
+
   int message_header;
   int received_amount;
   int connected = 0;
@@ -177,7 +179,7 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
         char *end_of_string = file_name + (string_size - string_left);
         received_amount =
             recv(client, end_of_string, string_left * sizeof(char), 0);
-        if (received_amount < sizeof(received_string_size)) {
+        if (received_amount <= 0) {
           fprintf(stderr, "Error receiving String from client.\n");
           connected = -1;
           break;
@@ -207,11 +209,13 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
 // [ STRING_SEPARATOR STRING_SIZE STRING]*
 // MESSAGE_END
 void send_file_table(SOCKET client, FILE_TABLE *files) {
-  printf("Sending file table to client.\n");
   int32_t header = htonl(FILE_TABLE_REQUEST);
   char string_separator = FILE_TABLE_STRING_SEPARATOR;
   char message_end = FILE_TABLE_MESSAGE_END;
   FILE_TABLE *pointer;
+
+  printf("Sending file table to client.\n");
+
   // Send Header
   send(client, &header, sizeof(header), MSG_MORE);
   // Send File Names
@@ -231,11 +235,13 @@ void send_file_table(SOCKET client, FILE_TABLE *files) {
 // FILE CONTENT
 // EOF
 void send_file_content(SOCKET client, char *file) {
-  printf("Sending contents of file '%s' to client.\n", file);
   char buffer[MAX_SENDING_BUFFER_SIZE];
   int32_t header = htonl(FILE_CONTENT_REQUEST);
   char message_end = FILE_CONTENT_MESSAGE_END;
   FILE *file_handler;
+
+  printf("Sending contents of file '%s' to client.\n", file);
+
   // Send Header
   send(client, &header, sizeof(header), MSG_MORE);
   // Send File
