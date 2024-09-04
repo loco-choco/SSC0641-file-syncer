@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 typedef int SOCKET;
 void *syncee_init(SYNCEE_ARGS *args) {
@@ -41,7 +42,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
   if (connect(client, (struct sockaddr *)&server_addr_in,
               sizeof(server_addr_in)) < 0) {
     fprintf(stderr, "Wasn't able to connect to server in %s.\n", server_addr);
-    goto FREE_AND_EXIT;
+    goto CLOSE_FREE_AND_EXIT;
   }
   int connected = 0;
 
@@ -85,7 +86,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
     if (received_amount < sizeof(char)) {
       fprintf(stderr, "Error receiving Separator from server.\n");
       connected = -1;
-      goto FREE_AND_EXIT;
+      goto CLOSE_FREE_AND_EXIT;
     }
     if (separator_read == '|') {
       received_amount =
@@ -93,7 +94,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
       if (received_amount < sizeof(int32_t)) {
         fprintf(stderr, "Error receiving string size from server.\n");
         connected = -1;
-        goto FREE_AND_EXIT;
+        goto CLOSE_FREE_AND_EXIT;
       }
       file_name_size = ntohl(received_file_name_size);
       file_name_string = calloc(file_name_size + 1, sizeof(char));
@@ -121,7 +122,12 @@ void *syncee_init(SYNCEE_ARGS *args) {
       received_it_all = 1;
     }
   }
-FREE_AND_EXIT:
+CLOSE_FREE_AND_EXIT:
+  printf("Closing connection to %s.\n", server_addr);
+  // Close Socket
+  if (close(client) != 0) {
+    fprintf(stderr, "Failed to close client socket.\n");
+  }
   // Free and Exit
   FILE_TABLE *next;
   while (server_files != NULL) {

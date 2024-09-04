@@ -195,6 +195,7 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
   }
 
   // Close client socket
+  printf("Closing conection to client.\n");
   if (close(client) != 0) {
     fprintf(stderr, "Failed to close client socket.\n");
   }
