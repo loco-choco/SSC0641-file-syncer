@@ -156,36 +156,19 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
       send_file_table(client, file_table);
       pthread_mutex_unlock(files_mutex);
     } else if (message_header == FILE_CONTENT_REQUEST) { // FILE CONTENT REQUEST
-      // Receive string size
-      int32_t received_string_size;
-      int string_size;
-      received_amount =
-          recv(client, &received_string_size, sizeof(received_string_size), 0);
-      if (received_amount < sizeof(received_string_size)) {
+      // Receive string
+      char *file_name;
+      int status = read_string_from_socket(client, &file_name);
+      if (status == -1) {
         fprintf(stderr, "Error receiving String Size from client.\n");
         connected = -1;
         continue;
-      }
-      string_size = ntohl(received_string_size);
-      // Receive the string
-      int string_left = string_size;
-      char *file_name = calloc(string_size + 1, sizeof(char));
-      // If it doesnt come all at once, read it in parts untill the whole size
-      // of the string is read
-      while (string_left > 0) {
-        char *end_of_string = file_name + (string_size - string_left);
-        received_amount =
-            recv(client, end_of_string, string_left * sizeof(char), 0);
-        if (received_amount <= 0) {
-          fprintf(stderr, "Error receiving String from client.\n");
-          connected = -1;
-          break;
-        }
-        string_left -= received_amount;
-      }
-      // If during the string read something went wrong, continue
-      if (connected < 0)
+
+      } else if (status == -2) {
+        fprintf(stderr, "Error receiving String from client.\n");
+        connected = -1;
         continue;
+      }
       // Send file contents
       send_file_content(client, file_name);
     }
@@ -219,10 +202,8 @@ void send_file_table(SOCKET client, FILE_TABLE *files) {
   // Send File Names
   pointer = files;
   while (pointer != NULL) {
-    int32_t file_name_size = htonl(strlen(pointer->file));
     send(client, &string_separator, sizeof(char), MSG_MORE);
-    send(client, &file_name_size, sizeof(file_name_size), MSG_MORE);
-    send(client, pointer->file, sizeof(char) * file_name_size, MSG_MORE);
+    write_string_to_socket(pointer->file, client);
     pointer = pointer->next;
   }
   // Send end of Message

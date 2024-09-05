@@ -71,8 +71,6 @@ void *syncee_init(SYNCEE_ARGS *args) {
   printf("Receiving File Table from server.\n");
   int received_it_all = 0;
   char separator_read;
-  int file_name_size;
-  int32_t received_file_name_size;
   char *file_name_string;
   server_files = NULL;
   while (received_it_all == 0) {
@@ -83,28 +81,17 @@ void *syncee_init(SYNCEE_ARGS *args) {
       goto CLOSE_FREE_AND_EXIT;
     }
     if (separator_read == FILE_TABLE_STRING_SEPARATOR) {
-      received_amount =
-          recv(client, &received_file_name_size, sizeof(int32_t), 0);
-      if (received_amount < sizeof(int32_t)) {
+      int status = read_string_from_socket(client, &file_name_string);
+      if (status == -1) {
         fprintf(stderr, "Error receiving string size from server.\n");
         connected = -1;
         goto CLOSE_FREE_AND_EXIT;
+
+      } else if (status == -2) {
+        fprintf(stderr, "Error receiving string from server.\n");
+        connected = -1;
+        goto CLOSE_FREE_AND_EXIT;
       }
-      file_name_size = ntohl(received_file_name_size);
-      file_name_string = calloc(file_name_size + 1, sizeof(char));
-      int string_left = file_name_size;
-
-      while (string_left > 0) {
-        char *end_of_string = file_name_string + (file_name_size - string_left);
-        received_amount =
-            recv(client, end_of_string, string_left * sizeof(char), 0);
-        if (received_amount <= 0) {
-          fprintf(stderr, "Error receiving string from server.\n");
-        }
-
-        string_left -= received_amount;
-      }
-
       FILE_TABLE *new_entry = calloc(1, sizeof(FILE_TABLE));
       new_entry->file = file_name_string;
       new_entry->next = server_files;
