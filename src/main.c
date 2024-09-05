@@ -28,8 +28,6 @@ int main(int argc, char **argv) {
   strcpy(syncer_args->dir, ".");
   pthread_create(&syncer_thread, NULL, (void *)syncer_init, syncer_args);
 
-  // TODO FIX NOT ALL FILES BEING SENT
-
   // TODO Create syncee_init thread
   // printf("Creating client thread in 10s\n");
   // sleep(10);

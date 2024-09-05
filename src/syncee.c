@@ -93,7 +93,6 @@ void *syncee_init(SYNCEE_ARGS *args) {
       file_name_size = ntohl(received_file_name_size);
       file_name_string = calloc(file_name_size + 1, sizeof(char));
       int string_left = file_name_size;
-      printf("string size %d.\n", file_name_size);
 
       while (string_left > 0) {
         char *end_of_string = file_name_string + (file_name_size - string_left);
