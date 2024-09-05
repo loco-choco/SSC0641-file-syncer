@@ -2,8 +2,10 @@
 #include "file-table.h"
 #include "message-definition.h"
 #include <arpa/inet.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <poll.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,12 +15,16 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+typedef int SOCKET;
+typedef int PIPE;
+
 typedef struct named_pipes_list {
-  FILE pipe;
+  PIPE pipe;
+  char *name;
   struct named_pipes_list *next;
 } NAMED_PIPES_LIST;
 
-typedef int SOCKET;
+// int handle_inotify_event(INOTIFY_API inotify, SOCKET client);
 
 void *syncee_init(SYNCEE_ARGS *args) {
   SOCKET client;
@@ -28,6 +34,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
 
   FILE_TABLE *server_files;
   NAMED_PIPES_LIST *pipes_list;
+  struct pollfd *pipe_events;
 
   printf("Syncee thread created.\n");
 
@@ -151,21 +158,91 @@ void *syncee_init(SYNCEE_ARGS *args) {
     buffer[buffer_ocupied - 1] = '\0';
     printf("Contents:\n%s\n", buffer);
   }*/
+  // Create fd for inotify API
+  // POLLOUT
 
-  // Create Named Pipes from each file name
+  // Create Named Pipes from each file name, add them to the pipes list , and
+  // open them as write only
+
+  // TODO Return to using INOTIFY, but remember to set PULLOUT
+  //
+  printf("Creating pipe files.\n");
+  int amount_of_pipes = 0;
+  pipes_list = NULL;
   FILE_TABLE *file = server_files;
   while (file != NULL) {
-    char *prefix = "pipes/";
+    char *prefix = "server-";
     char *pipe_name =
         calloc(strlen(prefix) + strlen(file->file) + 1, sizeof(char));
     strcat(pipe_name, prefix);
     strcat(pipe_name, file->file);
+    // Add to list and create named pipe
+    NAMED_PIPES_LIST *new = malloc(sizeof(NAMED_PIPES_LIST));
+    new->next = pipes_list;
+    new->name = pipe_name;
     mkfifo(pipe_name, 0666);
+    // Open pipe as write only
+    new->pipe = open(pipe_name, O_WRONLY | O_NONBLOCK);
+    printf("fd %d (%s).\n", new->pipe, pipe_name);
+    if (new->pipe == -1) {
+      fprintf(stderr, "Issues opening %s, removing named pipe.\n", pipe_name);
+      unlink(pipe_name);
+      free(pipe_name);
+      free(new);
+      file = file->next;
+      continue;
+    }
+    amount_of_pipes++;
+    pipes_list = new;
+
     file = file->next;
-    printf("making pipe %s.\n", pipe_name);
-    free(pipe_name);
   }
-  // Add inotify for each
+  // Create array for pooling events on the pipes
+  pipe_events = malloc(sizeof(struct pollfd) * amount_of_pipes);
+
+  NAMED_PIPES_LIST *current = pipes_list;
+  int i = 0;
+  while (current != NULL) {
+    pipe_events[i].fd = current->pipe;
+    pipe_events[i].events =
+        POLLOUT; // Seek events of stuff *reading* from the pipe
+    i++;
+    current = current->next;
+  }
+  // Start pooling pipe events
+  int watching = 0;
+  if (amount_of_pipes == 0) {
+    printf("No pipes to watch, exiting.\n");
+
+    watching = -1;
+  } else
+    printf("Watching created pipes.\n");
+  while (watching == 0 && connected == 0) {
+    int ready = poll(pipe_events, amount_of_pipes, -1);
+    if (ready == -1) {
+      if (errno == EINTR)
+        continue;
+      fprintf(stderr,
+              "Issues while watching pipes, exiting and disconecting.\n");
+      watching = -1;
+      continue;
+    }
+    // Receive pipe Events
+    printf("Receiving pipe events.\n");
+    NAMED_PIPES_LIST *current = pipes_list;
+    int i = 0;
+    while (current != NULL) {
+      if (pipe_events[i].revents != 0) {
+        printf("  fd=%d; events: %s%s%s\n", pipe_events[i].fd,
+               (pipe_events[i].revents & POLLIN) ? "POLLIN " : "",
+               (pipe_events[i].revents & POLLHUP) ? "POLLHUP " : "",
+               (pipe_events[i].revents & POLLERR) ? "POLLERR " : "");
+      }
+
+      i++;
+      current = current->next;
+    }
+  }
 
 CLOSE_FREE_AND_EXIT:
   printf("Closing connection to %s.\n", server_addr);
@@ -173,7 +250,16 @@ CLOSE_FREE_AND_EXIT:
   if (close(client) != 0) {
     fprintf(stderr, "Failed to close client socket.\n");
   }
-  // Free and Exit
+  // Free file table and pipe list, and exit
+  NAMED_PIPES_LIST *pipe_next;
+  while (pipes_list != NULL) {
+    pipe_next = pipes_list->next;
+    close(pipes_list->pipe);
+    unlink(pipes_list->name);
+    free(pipes_list->name);
+    free(pipes_list);
+    pipes_list = pipe_next;
+  }
   FILE_TABLE *next;
   while (server_files != NULL) {
     next = server_files->next;
@@ -185,3 +271,34 @@ CLOSE_FREE_AND_EXIT:
   free(args);
   pthread_exit(NULL);
 }
+/*
+int handle_inotify_event(INOTIFY_API inotify, SOCKET client) {
+  // Aligned buffer, see reason in the example at
+  // https://man7.org/linux/man-pages/man7/inotify.7.html
+  char buf[4096] __attribute__((aligned(__alignof__(struct inotify_event))));
+  const struct inotify_event *event;
+  ssize_t len;
+  int read_all_events = 0;
+  while (read_all_events == 0) {
+    // Read events to buffer
+    len = read(inotify, buf, sizeof(buf));
+    if (len == -1 && errno != EAGAIN) {
+      fprintf(stderr, "Issue reading inotify events.\n");
+      return -1;
+    }
+    // No more events, exit
+    if (len <= 0) {
+      read_all_events = 1;
+      break;
+    }
+    // Loop over events
+    for (char *ptr = buf; ptr < buf + len;
+         ptr += sizeof(struct inotify_event) + event->len) {
+
+      event = (const struct inotify_event *)ptr;
+      if (event->mask & IN_OPEN)
+        printf("Someone Opened Pipe %s.\n", event->name);
+    }
+  }
+  return 0;
+}*/
