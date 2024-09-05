@@ -104,7 +104,8 @@ void *syncee_init(SYNCEE_ARGS *args) {
       received_it_all = 1;
     }
   }
-
+  // TODO USE THIS EXAMPLE CODE
+  /*
   // Ask For File Data from server
   printf("Asking server in %s for file data of '%s'.\n", server_addr,
          server_files->file);
@@ -138,7 +139,8 @@ void *syncee_init(SYNCEE_ARGS *args) {
   else {
     buffer[buffer_ocupied - 1] = '\0';
     printf("Contents:\n%s\n", buffer);
-  }
+  }*/
+
   // Create Named Pipes from each file name
   // Add inotify for each
 
