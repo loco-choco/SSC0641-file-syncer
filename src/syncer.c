@@ -137,21 +137,18 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
 
   printf("New syncer receiver thread.\n");
 
-  int message_header;
+  char message_header;
   int received_amount;
   int connected = 0;
   while (connected == 0) {
     // Read Message Header
-    int32_t received_header;
-    received_amount =
-        recv(client, &received_header, sizeof(received_header), 0);
-    if (received_amount < sizeof(received_amount)) {
+    received_amount = recv(client, &message_header, sizeof(message_header), 0);
+    if (received_amount < sizeof(message_header)) {
       fprintf(stderr, "Error receiving Header from client.\n");
       connected = -1;
       continue;
     }
     // Filter message type
-    message_header = ntohl(received_header);
     if (message_header == FILE_TABLE_REQUEST) { // TABLE REQUEST
       // Send file table
       // Locking it as file_table is shared, even if in "readonly" mode
@@ -210,7 +207,7 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
 // [ STRING_SEPARATOR STRING_SIZE STRING]*
 // MESSAGE_END
 void send_file_table(SOCKET client, FILE_TABLE *files) {
-  int32_t header = htonl(FILE_TABLE_REQUEST);
+  char header = FILE_TABLE_REQUEST;
   char string_separator = FILE_TABLE_STRING_SEPARATOR;
   char message_end = FILE_TABLE_MESSAGE_END;
   FILE_TABLE *pointer;
@@ -228,7 +225,7 @@ void send_file_table(SOCKET client, FILE_TABLE *files) {
     send(client, pointer->file, sizeof(char) * file_name_size, MSG_MORE);
     pointer = pointer->next;
   }
-  // Send end of Messgae
+  // Send end of Message
   send(client, &message_end, sizeof(char), 0);
 }
 // File Content Message Format:
@@ -237,7 +234,7 @@ void send_file_table(SOCKET client, FILE_TABLE *files) {
 // EOF
 void send_file_content(SOCKET client, char *file) {
   char buffer[MAX_SENDING_BUFFER_SIZE];
-  int32_t header = htonl(FILE_CONTENT_REQUEST);
+  char header = FILE_CONTENT_REQUEST;
   char message_end = FILE_CONTENT_MESSAGE_END;
   FILE *file_handler;
 

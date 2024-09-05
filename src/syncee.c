@@ -50,28 +50,22 @@ void *syncee_init(SYNCEE_ARGS *args) {
   printf("Asking server in %s for file table.\n", server_addr);
 
   // Send Request For File Table from server
-  int32_t file_table_request_header = htonl(FILE_TABLE_REQUEST);
-  send(client, &file_table_request_header, sizeof(int32_t), 0);
+  char file_table_request_header = FILE_TABLE_REQUEST;
+  send(client, &file_table_request_header, sizeof(char), 0);
   // Receive File Table
-  int message_header;
-  int32_t received_header;
+  char message_header;
   int received_amount;
-  received_amount = recv(client, &received_header, sizeof(received_amount), 0);
-  if (received_amount < sizeof(received_amount)) {
+  received_amount = recv(client, &message_header, sizeof(message_header), 0);
+  if (received_amount < sizeof(message_header)) {
     fprintf(stderr, "Error receiving Header from server.\n");
     connected = -1;
-    free(args->server_addr);
-    free(args);
-    pthread_exit(NULL);
+    goto CLOSE_FREE_AND_EXIT;
   }
   // Check if the Header is correct
-  message_header = ntohl(received_header);
   if (message_header != FILE_TABLE_REQUEST) {
     fprintf(stderr, "Server didnt send File Table Header.\n");
     connected = -1;
-    free(args->server_addr);
-    free(args);
-    pthread_exit(NULL);
+    goto CLOSE_FREE_AND_EXIT;
   }
   // Read and create file table
   printf("Receiving File Table from server.\n");
@@ -88,7 +82,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
       connected = -1;
       goto CLOSE_FREE_AND_EXIT;
     }
-    if (separator_read == '|') {
+    if (separator_read == FILE_TABLE_STRING_SEPARATOR) {
       received_amount =
           recv(client, &received_file_name_size, sizeof(int32_t), 0);
       if (received_amount < sizeof(int32_t)) {
@@ -99,6 +93,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
       file_name_size = ntohl(received_file_name_size);
       file_name_string = calloc(file_name_size + 1, sizeof(char));
       int string_left = file_name_size;
+      printf("string size %d.\n", file_name_size);
 
       while (string_left > 0) {
         char *end_of_string = file_name_string + (file_name_size - string_left);
@@ -118,7 +113,8 @@ void *syncee_init(SYNCEE_ARGS *args) {
 
       printf("FILE: %s.\n", file_name_string);
 
-    } else if (separator_read == '.') {
+    } else if (separator_read == FILE_TABLE_MESSAGE_END) {
+      printf("Received end of file table.\n");
       received_it_all = 1;
     }
   }
