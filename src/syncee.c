@@ -104,6 +104,44 @@ void *syncee_init(SYNCEE_ARGS *args) {
       received_it_all = 1;
     }
   }
+
+  // Ask For File Data from server
+  printf("Asking server in %s for file data of '%s'.\n", server_addr,
+         server_files->file);
+
+  // Send Request For File Data from server
+  char table_content_request_header = FILE_CONTENT_REQUEST;
+  send(client, &table_content_request_header, sizeof(char), MSG_MORE);
+  write_string_to_socket(server_files->file, client);
+  send(client, NULL, 0, 0); // Confirm to send the buffer
+
+  // Receive data From server
+  received_amount = recv(client, &message_header, sizeof(message_header), 0);
+  if (received_amount < sizeof(message_header)) {
+    fprintf(stderr, "Error receiving Header from server.\n");
+    connected = -1;
+    goto CLOSE_FREE_AND_EXIT;
+  }
+  // Check if the Header is correct
+  if (message_header != FILE_CONTENT_REQUEST) {
+    fprintf(stderr, "Server didnt send File Content Header.\n");
+    connected = -1;
+    goto CLOSE_FREE_AND_EXIT;
+  }
+  printf("Receiving data from server.\n");
+
+  char buffer[1024];
+  int buffer_ocupied;
+  buffer_ocupied = recv(client, buffer, sizeof(char) * 1024, 0);
+  if (buffer_ocupied >= 1024)
+    printf("More then buffer\n");
+  else {
+    buffer[buffer_ocupied - 1] = '\0';
+    printf("Contents:\n%s\n", buffer);
+  }
+  // Create Named Pipes from each file name
+  // Add inotify for each
+
 CLOSE_FREE_AND_EXIT:
   printf("Closing connection to %s.\n", server_addr);
   // Close Socket
