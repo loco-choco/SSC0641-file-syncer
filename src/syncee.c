@@ -2,21 +2,32 @@
 #include "file-table.h"
 #include "message-definition.h"
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+typedef struct named_pipes_list {
+  FILE pipe;
+  struct named_pipes_list *next;
+} NAMED_PIPES_LIST;
+
 typedef int SOCKET;
+
 void *syncee_init(SYNCEE_ARGS *args) {
   SOCKET client;
   struct sockaddr_in server_addr_in;
   char *server_addr = args->server_addr;
   int server_ip_type = args->ip_type;
+
   FILE_TABLE *server_files;
+  NAMED_PIPES_LIST *pipes_list;
 
   printf("Syncee thread created.\n");
 
@@ -142,6 +153,18 @@ void *syncee_init(SYNCEE_ARGS *args) {
   }*/
 
   // Create Named Pipes from each file name
+  FILE_TABLE *file = server_files;
+  while (file != NULL) {
+    char *prefix = "pipes/";
+    char *pipe_name =
+        calloc(strlen(prefix) + strlen(file->file) + 1, sizeof(char));
+    strcat(pipe_name, prefix);
+    strcat(pipe_name, file->file);
+    mkfifo(pipe_name, 0666);
+    file = file->next;
+    printf("making pipe %s.\n", pipe_name);
+    free(pipe_name);
+  }
   // Add inotify for each
 
 CLOSE_FREE_AND_EXIT:
