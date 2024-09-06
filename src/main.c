@@ -20,10 +20,11 @@ int main(int argc, char **argv) {
     return -1;
   }
   char *ip = argv[1];
+  int port = 8081;
 
   // Create syncer_init thread
   SYNCER_ARGS *syncer_args = calloc(1, sizeof(SYNCER_ARGS));
-  syncer_args->port = 8080;
+  syncer_args->port = port;
   syncer_args->dir = calloc(2, sizeof(char));
   strcpy(syncer_args->dir, ".");
   pthread_create(&syncer_thread, NULL, (void *)syncer_init, syncer_args);
@@ -32,7 +33,7 @@ int main(int argc, char **argv) {
   // printf("Creating client thread in 10s\n");
   // sleep(10);
   SYNCEE_ARGS *syncee_args = calloc(1, sizeof(SYNCEE_ARGS));
-  syncee_args->port = 8080;
+  syncee_args->port = port;
   syncee_args->server_addr = calloc(strlen(ip) + 1, sizeof(char));
   syncee_args->ip_type = AF_INET;
   strcpy(syncee_args->server_addr, ip);

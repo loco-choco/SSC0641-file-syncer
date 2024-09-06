@@ -10,16 +10,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/inotify.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 typedef int SOCKET;
+typedef int INOTIFY_FD;
+typedef int WATCHER;
 typedef int PIPE;
 
 typedef struct named_pipes_list {
-  PIPE pipe;
+  WATCHER pipe_watcher;
   char *name;
   struct named_pipes_list *next;
 } NAMED_PIPES_LIST;
@@ -34,7 +37,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
 
   FILE_TABLE *server_files;
   NAMED_PIPES_LIST *pipes_list;
-  struct pollfd *pipe_events;
+  INOTIFY_FD inotify;
 
   printf("Syncee thread created.\n");
 
@@ -159,15 +162,18 @@ void *syncee_init(SYNCEE_ARGS *args) {
     printf("Contents:\n%s\n", buffer);
   }*/
   // Create fd for inotify API
+  inotify = inotify_init1(IN_NONBLOCK);
+  if (inotify == -1) {
+    perror("inotify_init1");
+    fprintf(stderr, "Issues creating inotify api file descriptor, exiting and "
+                    "disconecting.\n");
+    connected = -1;
+    goto CLOSE_FREE_AND_EXIT;
+  }
   // POLLOUT
 
-  // Create Named Pipes from each file name, add them to the pipes list , and
-  // open them as write only
-
-  // TODO Return to using INOTIFY, but remember to set PULLOUT
-  //
+  // Create Named Pipes from each file name, add add watchers for each
   printf("Creating pipe files.\n");
-  int amount_of_pipes = 0;
   pipes_list = NULL;
   FILE_TABLE *file = server_files;
   while (file != NULL) {
@@ -182,65 +188,44 @@ void *syncee_init(SYNCEE_ARGS *args) {
     new->name = pipe_name;
     mkfifo(pipe_name, 0666);
     // Open pipe as write only
-    new->pipe = open(pipe_name, O_WRONLY | O_NONBLOCK);
-    printf("fd %d (%s).\n", new->pipe, pipe_name);
-    if (new->pipe == -1) {
-      fprintf(stderr, "Issues opening %s, removing named pipe.\n", pipe_name);
+    new->pipe_watcher =
+        inotify_add_watch(inotify, pipe_name, IN_OPEN | IN_CLOSE);
+    if (new->pipe_watcher == -1) {
+      fprintf(stderr, "Issues watching %s, removing named pipe.\n", pipe_name);
       unlink(pipe_name);
       free(pipe_name);
       free(new);
       file = file->next;
       continue;
     }
-    amount_of_pipes++;
     pipes_list = new;
 
     file = file->next;
   }
-  // Create array for pooling events on the pipes
-  pipe_events = malloc(sizeof(struct pollfd) * amount_of_pipes);
 
-  NAMED_PIPES_LIST *current = pipes_list;
-  int i = 0;
-  while (current != NULL) {
-    pipe_events[i].fd = current->pipe;
-    pipe_events[i].events =
-        POLLOUT; // Seek events of stuff *reading* from the pipe
-    i++;
-    current = current->next;
-  }
-  // Start pooling pipe events
+  // Prepare for inotify pooling
+  struct pollfd inotify_pool;
+  inotify_pool.events = POLLIN; // read events
+  inotify_pool.fd = inotify;
+
   int watching = 0;
-  if (amount_of_pipes == 0) {
-    printf("No pipes to watch, exiting.\n");
+  printf("Pooling file events.\n");
 
-    watching = -1;
-  } else
-    printf("Watching created pipes.\n");
   while (watching == 0 && connected == 0) {
-    int ready = poll(pipe_events, amount_of_pipes, -1);
+    int ready = poll(&inotify_pool, 1, -1);
     if (ready == -1) {
       if (errno == EINTR)
         continue;
-      fprintf(stderr,
-              "Issues while watching pipes, exiting and disconecting.\n");
+      fprintf(
+          stderr,
+          "Issues while pooling inotivy events, exiting and disconecting.\n");
       watching = -1;
       continue;
     }
     // Receive pipe Events
-    printf("Receiving pipe events.\n");
-    NAMED_PIPES_LIST *current = pipes_list;
-    int i = 0;
-    while (current != NULL) {
-      if (pipe_events[i].revents != 0) {
-        printf("  fd=%d; events: %s%s%s\n", pipe_events[i].fd,
-               (pipe_events[i].revents & POLLIN) ? "POLLIN " : "",
-               (pipe_events[i].revents & POLLHUP) ? "POLLHUP " : "",
-               (pipe_events[i].revents & POLLERR) ? "POLLERR " : "");
-      }
-
-      i++;
-      current = current->next;
+    printf("Receiving inotify events.\n");
+    if (inotify_pool.revents & POLLOUT) {
+      printf("Event :).\n");
     }
   }
 
@@ -254,7 +239,6 @@ CLOSE_FREE_AND_EXIT:
   NAMED_PIPES_LIST *pipe_next;
   while (pipes_list != NULL) {
     pipe_next = pipes_list->next;
-    close(pipes_list->pipe);
     unlink(pipes_list->name);
     free(pipes_list->name);
     free(pipes_list);
