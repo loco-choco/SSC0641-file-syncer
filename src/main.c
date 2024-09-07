@@ -85,6 +85,7 @@ int main(int argc, char **argv) {
   printf("Waiting for conections in the IPC socket.\n");
   while (1) {
     data_socket = accept(connection_socket, NULL, NULL);
+    printf("New client in IPC socket.\n");
     if (data_socket == -1) {
       fprintf(stderr, "Failed to accept client from  IPC socket.\n");
       exit(EXIT_FAILURE);
@@ -100,7 +101,7 @@ int main(int argc, char **argv) {
       }
       buffer[sizeof(buffer) - 1] = 0;
 
-      if (!strncmp(buffer, "L BOZO", sizeof(buffer))) {
+      if (!strncmp(buffer, "LBOZO", sizeof(buffer))) {
         end = 1;
         break;
       }
