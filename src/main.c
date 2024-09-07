@@ -3,6 +3,7 @@
 #include "syncer.h"
 #include <arpa/inet.h>
 #include <dirent.h>
+#include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,12 +16,22 @@ int main(int argc, char **argv) {
   SYNCEE_THREAD_LIST *syncee_threads;
   pthread_t syncee_thread_ex;
   pthread_mutex_t syncee_threads_mutex;
-  if (argc != 2) {
+  char *endptr;
+
+  if (argc != 3) {
     perror("Not enough args");
     return -1;
   }
   char *ip = argv[1];
-  int port = 8081;
+  int port;
+
+  errno = 0;
+  port = strtol(argv[2], &endptr, 10);
+
+  if (errno == ERANGE) {
+    perror("Port not a valid value");
+    exit(EXIT_FAILURE);
+  }
 
   // Create syncer_init thread
   SYNCER_ARGS *syncer_args = calloc(1, sizeof(SYNCER_ARGS));
