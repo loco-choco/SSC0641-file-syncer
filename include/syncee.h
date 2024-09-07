@@ -1,19 +1,20 @@
 #include <pthread.h>
 #include <sys/socket.h>
 
-#ifndef THREAD_LIST_H
-#define THREAD_LIST_H
+#ifndef SYNCEE_H
+#define SYNCEE_H
 
 typedef struct syncee_thread_list {
   pthread_t thread;
-  char *server_addr;
   struct thread_list *next;
 } SYNCEE_THREAD_LIST;
 
 typedef struct syncee_args {
+  int ipc_client;
   int port;
-  char *server_addr;
   int ip_type;
+  char *server_addr;
+  char *requested_file;
 } SYNCEE_ARGS;
 
 void *syncee_init(SYNCEE_ARGS *args);
