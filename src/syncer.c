@@ -102,7 +102,7 @@ void *syncer_init(SYNCER_ARGS *args) {
     new->next = client_threads;
     client_threads = new;
 
-    // TODO CREATE SYNCEE WITH NEW CLIENT
+    // TODO FIND A WAY TO CLOSE SERVER
   }
   printf("Closing Listener Socket.\n");
   // Close listening socket
