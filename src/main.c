@@ -1,5 +1,4 @@
 #include "file-table.h"
-#include "syncee.h"
 #include "syncer.h"
 #include <arpa/inet.h>
 #include <dirent.h>
@@ -11,18 +10,23 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#define SOCKET_NAME "/tmp/file-syncer.socket"
+#define RECEIVING_BUFFER_SIZE 12
+
+typedef int SOCKET;
+
 int main(int argc, char **argv) {
   pthread_t syncer_thread;
-  SYNCEE_THREAD_LIST *syncee_threads;
-  pthread_t syncee_thread_ex;
-  pthread_mutex_t syncee_threads_mutex;
+  SOCKET connection_socket;
+  char buffer[RECEIVING_BUFFER_SIZE];
   char *endptr;
 
-  if (argc != 3) {
+  // Get args
+  if (argc != 4) {
     perror("Not enough args");
     return -1;
   }
-  char *ip = argv[1];
+  char *dir = argv[1];
   int port;
 
   errno = 0;
@@ -36,22 +40,15 @@ int main(int argc, char **argv) {
   // Create syncer_init thread
   SYNCER_ARGS *syncer_args = calloc(1, sizeof(SYNCER_ARGS));
   syncer_args->port = port;
-  syncer_args->dir = calloc(2, sizeof(char));
-  strcpy(syncer_args->dir, ".");
+  syncer_args->dir = calloc(strlen(dir) + 1, sizeof(char));
+  strcpy(syncer_args->dir, dir);
   pthread_create(&syncer_thread, NULL, (void *)syncer_init, syncer_args);
 
-  // TODO Create syncee_init thread
-  // printf("Creating client thread in 10s\n");
-  // sleep(10);
-  SYNCEE_ARGS *syncee_args = calloc(1, sizeof(SYNCEE_ARGS));
-  syncee_args->port = port;
-  syncee_args->server_addr = calloc(strlen(ip) + 1, sizeof(char));
-  syncee_args->ip_type = AF_INET;
-  strcpy(syncee_args->server_addr, ip);
-  pthread_create(&syncee_thread_ex, NULL, (void *)syncee_init, syncee_args);
+  // Create Unix Domain Socket for IPC
+  // Receive commands from clients
 
+  // Waiting for server to close
   pthread_join(syncer_thread, NULL);
-  pthread_join(syncee_thread_ex, NULL);
-
+  // Clean up
   return 0;
 }
