@@ -1,4 +1,5 @@
 #include "file-table.h"
+#include "ipc-connection-definition.h"
 #include "syncer.h"
 #include <arpa/inet.h>
 #include <dirent.h>
@@ -12,7 +13,6 @@
 #include <sys/un.h>
 #include <unistd.h>
 
-#define SOCKET_NAME "/tmp/file-syncer.socket"
 #define LISTENER_BACKLOG_SIZE 20
 #define RECEIVING_BUFFER_SIZE 12
 
@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   int ret;
 
   // Get args
-  if (argc != 4) {
+  if (argc != 3) {
     fprintf(stderr, "Not enough args.\n");
     exit(EXIT_FAILURE);
   }
@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
   }
 
   // Create Unix Domain Socket for IPC
+  printf("Creating IPC socket.\n");
   connection_socket = socket(AF_UNIX, SOCK_STREAM, 0);
   if (connection_socket == -1) {
     fprintf(stderr, "Error creating IPC socket.\n");
@@ -81,6 +82,7 @@ int main(int argc, char **argv) {
   }
   // Wait for commands from clients
   // Handle client connections
+  printf("Waiting for conections in the IPC socket.\n");
   while (1) {
     data_socket = accept(connection_socket, NULL, NULL);
     if (data_socket == -1) {
