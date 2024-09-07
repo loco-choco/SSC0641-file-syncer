@@ -181,8 +181,8 @@ void *syncee_init(SYNCEE_ARGS *args) {
     new->next = pipes_list;
     new->name = pipe_name;
     mkfifo(pipe_name, 0666);
-    // Open pipe as write only
-    new->pipe = open(pipe_name, O_WRONLY | O_NONBLOCK);
+    // Open pipe as O_RDWR to not block
+    new->pipe = open(pipe_name, O_RDWR);
     printf("fd %d (%s).\n", new->pipe, pipe_name);
     if (new->pipe == -1) {
       fprintf(stderr, "Issues opening %s, removing named pipe.\n", pipe_name);
@@ -234,7 +234,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
     while (current != NULL) {
       if (pipe_events[i].revents != 0) {
         printf("  fd=%d; events: %s%s%s\n", pipe_events[i].fd,
-               (pipe_events[i].revents & POLLIN) ? "POLLIN " : "",
+               (pipe_events[i].revents & POLLOUT) ? "POLLOUT " : "",
                (pipe_events[i].revents & POLLHUP) ? "POLLHUP " : "",
                (pipe_events[i].revents & POLLERR) ? "POLLERR " : "");
       }
