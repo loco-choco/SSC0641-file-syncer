@@ -17,15 +17,14 @@ int main(int argc, char **argv) {
   struct sockaddr_un server_addr;
   ssize_t r, w;
   int ret;
+  char send_buffer[20];
 
   // Get args
   if (argc < 2) {
     fprintf(stderr, "Not enough args.\n");
     exit(EXIT_FAILURE);
-  } else if (argc > 2) {
-    fprintf(stderr, "Too many args.\n");
-    exit(EXIT_FAILURE);
   }
+
   char *command = argv[1];
 
   // Create Unix Domain Socket for connecting to server
@@ -52,11 +51,17 @@ int main(int argc, char **argv) {
 
   // Send command to server
   int success_state = EXIT_SUCCESS;
-  w = write(data_socket, command, strlen(command) + 1);
-  if (w == -1) {
-    fprintf(stderr, "Issues sending command to server.\n");
-    success_state = EXIT_FAILURE;
+  for (int i = 1; i < argc && success_state != EXIT_FAILURE; ++i) {
+    w = write(data_socket, argv[i], strlen(argv[i]) + 1);
+    if (w == -1) {
+      fprintf(stderr, "Issue sending %s.\n", argv[i]);
+      success_state = EXIT_FAILURE;
+    }
   }
+  char buffer[1024];
+  r = read(data_socket, buffer, sizeof(buffer));
+  if (r > 0)
+    printf("%s\n", buffer);
 
   // Closing socket and exiting
   close(data_socket);

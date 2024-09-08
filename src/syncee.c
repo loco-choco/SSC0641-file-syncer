@@ -30,7 +30,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
     fprintf(stderr, "Wasn't able to create client socket.\n");
     free(args->server_addr);
     free(args);
-    pthread_exit(NULL);
+    return 0;
   }
   server_addr_in.sin_family = args->ip_type;
   server_addr_in.sin_port = htons(args->port);
@@ -40,7 +40,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
     fprintf(stderr, "Invalid address %s\n", args->server_addr);
     free(args->server_addr);
     free(args);
-    pthread_exit(NULL);
+    return 0;
   }
   // Conect to server
   printf("Conecting to server in %s.\n", args->server_addr);
@@ -70,7 +70,7 @@ CLOSE_FREE_AND_EXIT:
   free(args->server_addr);
   free(args->requested_file);
   free(args);
-  pthread_exit(NULL);
+  return 0;
 }
 
 // Ask For File Table from server
