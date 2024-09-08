@@ -58,11 +58,19 @@ int main(int argc, char **argv) {
       success_state = EXIT_FAILURE;
     }
   }
-  char buffer[1024];
-  r = read(data_socket, buffer, sizeof(buffer));
-  if (r > 0)
-    printf("%s\n", buffer);
 
+  char peek;
+  while (recv(data_socket, &peek, sizeof(char), MSG_PEEK) != -1 &&
+         peek != EOF) {
+    char *output;
+    int status;
+    status = read_ipc_socket_string(data_socket, &output);
+    if (status == -1) {
+      break;
+    }
+    printf("%s\n", output);
+    free(output);
+  }
   // Closing socket and exiting
   close(data_socket);
   exit(success_state);
