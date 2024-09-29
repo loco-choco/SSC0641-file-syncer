@@ -102,14 +102,29 @@ int main(int argc, char **argv) {
 
     if (!strcmp(command, "close")) {
       end = 1;
-    } else if (!strcmp(command, "list")) {
-      printf("Client wants to list files.\n");
+    } else if (!strcmp(command, "list") || !strcmp(command, "cat")) {
+      char *file_name = NULL; // If it isnt a file cat, it being NULL creates a
+                              // list file request
+      int cat = strcmp(command, "cat");
+      if (cat == 0) {
+        status = read_ipc_socket_string(data_socket, &file_name);
+        if (status == -1) {
+          fprintf(stderr,
+                  "Failed to read file name from client from  IPC socket.\n");
+          close(data_socket);
+          continue;
+        }
+        printf("Client wants to cat file.\n");
+      } else {
+        printf("Client wants to list files.\n");
+      }
       // Receive ip from client
       char *ip;
       status = read_ipc_socket_string(data_socket, &ip);
-      printf("ip.\n");
+      printf("ip. %s\n", ip);
       if (status == -1) {
         fprintf(stderr, "Failed to read ip from client from  IPC socket.\n");
+        free(file_name);
         close(data_socket);
         continue;
       }
@@ -117,9 +132,10 @@ int main(int argc, char **argv) {
       // Receive port from client
       char *port;
       status = read_ipc_socket_string(data_socket, &port);
-      printf("port.\n");
+      printf("port. %s\n", port);
       if (status == -1) {
         fprintf(stderr, "Failed to read ip from client from  IPC socket.\n");
+        free(file_name);
         free(ip);
         close(data_socket);
         continue;
@@ -132,6 +148,7 @@ int main(int argc, char **argv) {
       printf("port %d\n", server_port);
       if (errno == ERANGE) {
         fprintf(stderr, "Port is not a valid value.\n");
+        free(file_name);
         close(data_socket);
         free(ip);
         continue;
@@ -143,7 +160,8 @@ int main(int argc, char **argv) {
       syncee_args->port = server_port;
       syncee_args->ip_type = AF_INET;
       syncee_args->server_addr = ip;
-      syncee_args->requested_file = NULL; // This requests for the file table
+      syncee_args->requested_file =
+          file_name; // This requests for the file table
       syncee_init(syncee_args);
     } else { // Not valid request
       close(data_socket);

@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
   char *command = argv[1];
 
   // Create Unix Domain Socket for connecting to server
-  printf("Creating IPC socket client.\n");
+  // printf("Creating IPC socket client.\n");
   data_socket = socket(AF_UNIX, SOCK_STREAM, 0);
   if (data_socket == -1) {
     fprintf(stderr, "Error creating IPC socket.\n");
@@ -58,18 +58,22 @@ int main(int argc, char **argv) {
       success_state = EXIT_FAILURE;
     }
   }
-
-  char peek;
-  while (recv(data_socket, &peek, sizeof(char), MSG_PEEK) != -1 &&
-         peek != EOF) {
-    char *output;
-    int status;
-    status = read_ipc_socket_string(data_socket, &output);
-    if (status == -1) {
-      break;
+  int received_it_all = 0;
+  while (received_it_all == 0) {
+    char buffer[RECEIVING_STREAM_BUFFER_SIZE];
+    int buffer_ocupied;
+    buffer_ocupied = recv(data_socket, buffer,
+                          sizeof(char) * (RECEIVING_STREAM_BUFFER_SIZE - 1), 0);
+    if (buffer_ocupied == -1) {
+      fprintf(stderr, "Issues while receving awnser from deamon\n");
+      return -1;
     }
-    printf("%s\n", output);
-    free(output);
+    if (buffer[buffer_ocupied - 1] == EOF) {
+      received_it_all = 1;
+      buffer_ocupied--; // Dont fwrite the EOF
+    }
+    fwrite(buffer, sizeof(char), buffer_ocupied, stdout);
+    fflush(stdout);
   }
   // Closing socket and exiting
   close(data_socket);

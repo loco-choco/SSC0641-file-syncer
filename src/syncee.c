@@ -112,8 +112,12 @@ int get_file_table_for_ipc(SOCKET server, SOCKET ipc_client) {
       }
 
       // Send request back to IPC client
+      int name_size = strlen(file_name_string);
+      char *formated_output = calloc(name_size + 2, sizeof(char));
+      strcpy(formated_output, file_name_string);
+      formated_output[name_size] = '\n';
       send(ipc_client, file_name_string,
-           sizeof(char) * (strlen(file_name_string) + 1), 0);
+           sizeof(char) * strlen(file_name_string), 0);
       printf("FILE: %s.\n", file_name_string);
       free(file_name_string);
 
@@ -123,8 +127,9 @@ int get_file_table_for_ipc(SOCKET server, SOCKET ipc_client) {
     }
   }
   // Send end of request as EOF, just like when fetching file content
-  char eof = EOF;
-  send(ipc_client, &eof, sizeof(char), 0);
+  char eof[2] = "\n";
+  eof[1] = EOF;
+  send(ipc_client, &eof, sizeof(char) * 2, 0);
 
   return 0;
 }
@@ -163,7 +168,7 @@ int get_file_contents_for_ipc(SOCKET server, char *file, SOCKET ipc_client) {
     }
     send(ipc_client, buffer, sizeof(char) * buffer_ocupied, 0);
     if (buffer[buffer_ocupied - 1] == EOF) {
-      printf("Received all the file");
+      printf("Received all the file (%d)\n", buffer_ocupied);
       received_it_all = 1;
     }
   }
