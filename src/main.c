@@ -50,6 +50,8 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
+  unlink(SOCKET_NAME); // Remove the socket file just in case the deamon wasnt
+                       // cleaninly exited
   // Bind IPC socket to name
   // For portability. See:
   // https://www.man7.org/linux/man-pages/man7/unix.7.html
@@ -175,7 +177,7 @@ int main(int argc, char **argv) {
   printf("Exiting program.\n");
 
   // Waiting for server to close
-  pthread_join(syncer_thread, NULL);
+  // pthread_join(syncer_thread, NULL);
   // Closing IPC socket
   close(connection_socket);
   // Removing tmp socket file
