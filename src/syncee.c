@@ -21,13 +21,14 @@ void *syncee_init(SYNCEE_ARGS *args) {
   SOCKET server;
   struct sockaddr_in server_addr_in;
   SOCKET ipc_client = args->ipc_client;
-
+  char end_ipc_connection = EOF;
   printf("Syncee thread created.\n");
 
   // Create Client Socket and Connect it to Server
   server = socket(AF_INET, SOCK_STREAM, 0);
   if (server < 0) {
     fprintf(stderr, "Wasn't able to create client socket.\n");
+    send(ipc_client, &end_ipc_connection, sizeof(char), 0);
     free(args->server_addr);
     free(args);
     return 0;
@@ -38,6 +39,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
   if (inet_pton(args->ip_type, args->server_addr, &server_addr_in.sin_addr) <=
       0) {
     fprintf(stderr, "Invalid address %s\n", args->server_addr);
+    send(ipc_client, &end_ipc_connection, sizeof(char), 0);
     free(args->server_addr);
     free(args);
     return 0;
@@ -48,6 +50,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
               sizeof(server_addr_in)) < 0) {
     fprintf(stderr, "Wasn't able to connect to server in %s.\n",
             args->server_addr);
+    send(ipc_client, &end_ipc_connection, sizeof(char), 0);
     goto CLOSE_FREE_AND_EXIT;
   }
 

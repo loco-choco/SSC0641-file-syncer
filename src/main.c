@@ -93,6 +93,8 @@ int main(int argc, char **argv) {
     }
     // TODO FIX READING SO IT DOESNT END UP READING THE WHOLE INPUT IN THE
     // BUFFER MAKE IT STOP IN \0
+    char end_connection = EOF; // Var to hold a EOF if we need to end a
+                               // connection to the IPC client
     int end = 0;
     int status;
     char *command;
@@ -113,6 +115,7 @@ int main(int argc, char **argv) {
         if (status == -1) {
           fprintf(stderr,
                   "Failed to read file name from client from  IPC socket.\n");
+          write(data_socket, &end_connection, sizeof(char));
           close(data_socket);
           continue;
         }
@@ -127,6 +130,7 @@ int main(int argc, char **argv) {
       if (status == -1) {
         fprintf(stderr, "Failed to read ip from client from  IPC socket.\n");
         free(file_name);
+        write(data_socket, &end_connection, sizeof(char));
         close(data_socket);
         continue;
       }
@@ -139,6 +143,7 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Failed to read ip from client from  IPC socket.\n");
         free(file_name);
         free(ip);
+        write(data_socket, &end_connection, sizeof(char));
         close(data_socket);
         continue;
       }
@@ -151,6 +156,7 @@ int main(int argc, char **argv) {
       if (errno == ERANGE) {
         fprintf(stderr, "Port is not a valid value.\n");
         free(file_name);
+        write(data_socket, &end_connection, sizeof(char));
         close(data_socket);
         free(ip);
         continue;
@@ -166,6 +172,7 @@ int main(int argc, char **argv) {
           file_name; // This requests for the file table
       syncee_init(syncee_args);
     } else { // Not valid request
+      write(data_socket, &end_connection, sizeof(char));
       close(data_socket);
     }
 
