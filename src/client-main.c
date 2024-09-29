@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     fprintf(stderr, "Server not responding.\n");
     exit(EXIT_FAILURE);
   }
-
+  int is_command_close = 0;
   // Send command to server
   int success_state = EXIT_SUCCESS;
   for (int i = 1; i < argc && success_state != EXIT_FAILURE; ++i) {
@@ -57,6 +57,13 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Issue sending %s.\n", argv[i]);
       success_state = EXIT_FAILURE;
     }
+    if (!strcmp(argv[i], "close")) {
+      is_command_close = 1;
+    }
+  }
+  if (is_command_close == 1 || success_state == EXIT_FAILURE) {
+    close(data_socket);
+    exit(success_state);
   }
   int received_it_all = 0;
   while (received_it_all == 0) {
