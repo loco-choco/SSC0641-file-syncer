@@ -1,4 +1,4 @@
 /out/*
 !/out/.keepfolder
 .ccls-cache/
-result/
+result
