@@ -9,7 +9,7 @@ typedef int SOCKET;
 int write_string_to_socket(char *string, SOCKET socket) {
   int32_t string_lenght = htonl(strlen(string));
   send(socket, &string_lenght, sizeof(string_lenght), MSG_MORE);
-  send(socket, string, sizeof(char) * string_lenght, MSG_MORE);
+  send(socket, string, sizeof(char) * strlen(string), MSG_MORE);
 }
 
 int read_string_from_socket(SOCKET socket, char **string) {

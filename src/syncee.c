@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define RECEIVE_FILE_BUFFER_SIZE 1024
+#define RECEIVE_FILE_BUFFER_SIZE 512
 
 typedef int SOCKET;
 
@@ -119,20 +119,23 @@ int get_file_table_for_ipc(SOCKET server, SOCKET ipc_client) {
       char *formated_output = calloc(name_size + 2, sizeof(char));
       strcpy(formated_output, file_name_string);
       formated_output[name_size] = '\n';
-      send(ipc_client, file_name_string,
-           sizeof(char) * strlen(file_name_string), 0);
+      send(ipc_client, formated_output, sizeof(char) * strlen(formated_output),
+           0);
       printf("FILE: %s.\n", file_name_string);
+      free(formated_output);
       free(file_name_string);
 
     } else if (separator_read == FILE_TABLE_MESSAGE_END) {
       printf("Received end of file table.\n");
       received_it_all = 1;
+    } else {
+      received_it_all = -1;
+      fprintf(stderr, "Received wrong separator.\n");
     }
   }
   // Send end of request as EOF, just like when fetching file content
-  char eof[2] = "\n";
-  eof[1] = EOF;
-  send(ipc_client, &eof, sizeof(char) * 2, 0);
+  char eof = EOF;
+  send(ipc_client, &eof, sizeof(char), 0);
 
   return 0;
 }
@@ -169,6 +172,7 @@ int get_file_contents_for_ipc(SOCKET server, char *file, SOCKET ipc_client) {
       fprintf(stderr, "Issue while receiving file\n");
       return -1;
     }
+    printf("Received %d bytes\n", buffer_ocupied);
     send(ipc_client, buffer, sizeof(char) * buffer_ocupied, 0);
     if (buffer[buffer_ocupied - 1] == EOF) {
       printf("Received all the file (%d)\n", buffer_ocupied);
