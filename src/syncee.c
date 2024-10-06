@@ -171,12 +171,11 @@ int get_file_contents_for_ipc(SOCKET server, char *file, SOCKET ipc_client) {
     if (buffer_ocupied == -1) {
       fprintf(stderr, "Issue while receiving file\n");
       return -1;
-    }
-    printf("Received %d bytes\n", buffer_ocupied);
-    send(ipc_client, buffer, sizeof(char) * buffer_ocupied, 0);
-    if (buffer[buffer_ocupied - 1] == EOF) {
-      printf("Received all the file (%d)\n", buffer_ocupied);
+    } else if (buffer_ocupied > 0) {
+      send(ipc_client, buffer, sizeof(char) * buffer_ocupied, 0);
+    } else {
       received_it_all = 1;
+      printf("Received end of file\n");
     }
   }
   return 0;

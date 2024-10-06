@@ -1,6 +1,7 @@
 #include "syncer.h"
 #include "file-table.h"
 #include "message-definition.h"
+#include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
 #include <pthread.h>
@@ -89,7 +90,10 @@ void *syncer_init(SYNCER_ARGS *args) {
       fprintf(stderr, "Accepting conection of client failed.\n");
       continue;
     }
-    printf("New conection from %s.\n", client_addr.sa_data);
+    char client_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &((struct sockaddr_in *)&client_addr)->sin_addr,
+              client_ip, INET_ADDRSTRLEN);
+    printf("New conection from %s.\n", client_ip);
     // Give new socket to client thread
     pthread_t client_thread;
     SYNCER_RECEIVER_ARGS *receiver_args =
@@ -142,41 +146,37 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
 
   char message_header;
   int received_amount;
-  int connected = 0;
-  while (connected == 0) {
-    // Read Message Header
-    received_amount = recv(client, &message_header, sizeof(message_header), 0);
-    if (received_amount < sizeof(message_header)) {
-      fprintf(stderr, "Error receiving Header from client.\n");
-      connected = -1;
-      continue;
-    }
-    // Filter message type
-    if (message_header == FILE_TABLE_REQUEST) { // TABLE REQUEST
-      // Send file table
-      // Locking it as file_table is shared, even if in "readonly" mode
-      pthread_mutex_lock(files_mutex);
-      send_file_table(client, file_table);
-      pthread_mutex_unlock(files_mutex);
-    } else if (message_header == FILE_CONTENT_REQUEST) { // FILE CONTENT REQUEST
-      // Receive string
-      char *file_name;
-      int status = read_string_from_socket(client, &file_name);
-      if (status == -1) {
-        fprintf(stderr, "Error receiving String Size from client.\n");
-        connected = -1;
-        continue;
 
-      } else if (status == -2) {
-        fprintf(stderr, "Error receiving String from client.\n");
-        connected = -1;
-        continue;
-      }
-      // Send file contents
-      send_file_content(client, file_table, dir, file_name);
+  // Read Message Header
+  received_amount = recv(client, &message_header, sizeof(message_header), 0);
+  if (received_amount < sizeof(message_header)) {
+    fprintf(stderr, "Error receiving Header from client.\n");
+    goto CLOSE_AND_FREE;
+  }
+  // Filter message type
+  if (message_header == FILE_TABLE_REQUEST) { // TABLE REQUEST
+    // Send file table
+    // Locking it as file_table is shared, even if in "readonly" mode
+    pthread_mutex_lock(files_mutex);
+    send_file_table(client, file_table);
+    pthread_mutex_unlock(files_mutex);
+  } else if (message_header == FILE_CONTENT_REQUEST) { // FILE CONTENT REQUEST
+    // Receive string
+    char *file_name;
+    int status = read_string_from_socket(client, &file_name);
+    if (status == -1) {
+      fprintf(stderr, "Error receiving string size from client.\n");
+      goto CLOSE_AND_FREE;
+
+    } else if (status == -2) {
+      fprintf(stderr, "Error receiving string from client.\n");
+      goto CLOSE_AND_FREE;
     }
+    // Send file contents
+    send_file_content(client, file_table, dir, file_name);
   }
 
+CLOSE_AND_FREE:
   // Close client socket
   printf("Closing conection to client.\n");
   if (close(client) != 0) {
@@ -190,12 +190,10 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
 
 // File Table Request Message Format:
 // HEADER (FILE_TABLE_REQUEST)
-// [ STRING_SEPARATOR STRING_SIZE STRING]*
-// MESSAGE_END
+// [ STRING_SEPARATOR STRING_SIZE STRING ]*
 void send_file_table(SOCKET client, FILE_TABLE *files) {
   char header = FILE_TABLE_REQUEST;
   char string_separator = FILE_TABLE_STRING_SEPARATOR;
-  char message_end = FILE_TABLE_MESSAGE_END;
   FILE_TABLE *pointer;
 
   printf("Sending file table to client.\n");
@@ -209,18 +207,14 @@ void send_file_table(SOCKET client, FILE_TABLE *files) {
     write_string_to_socket(pointer->file, client);
     pointer = pointer->next;
   }
-  // Send end of Message
-  send(client, &message_end, sizeof(char), 0);
 }
 // File Content Message Format:
 // HEADER (FILE_CONTENT_REQUEST)
 // FILE CONTENT
-// EOF
 void send_file_content(SOCKET client, FILE_TABLE *files, char *dir,
                        char *file) {
   char buffer[MAX_SENDING_BUFFER_SIZE];
   char header = FILE_CONTENT_REQUEST;
-  char message_end = FILE_CONTENT_MESSAGE_END;
   FILE *file_handler;
 
   int file_in_table = 0;
@@ -250,7 +244,14 @@ void send_file_content(SOCKET client, FILE_TABLE *files, char *dir,
       size_t read_bytes;
       while ((read_bytes = fread(buffer, sizeof(char), MAX_SENDING_BUFFER_SIZE,
                                  file_handler)) > 0) {
-        send(client, buffer, sizeof(char) * read_bytes, 0);
+        int send_status = send(client, buffer, sizeof(char) * read_bytes, 0);
+        if (send_status < 0) {
+          fprintf(stderr,
+                  "Sending file '%s' to client had the following error: %s\n",
+                  file, strerror(errno));
+          fclose(file_handler);
+          return;
+        }
       }
       fclose(file_handler);
     } else {
@@ -259,6 +260,4 @@ void send_file_content(SOCKET client, FILE_TABLE *files, char *dir,
               file);
     }
   }
-  // Send end of Messgae
-  send(client, &message_end, sizeof(char), 0);
 }

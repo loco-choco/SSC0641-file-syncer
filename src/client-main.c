@@ -70,17 +70,16 @@ int main(int argc, char **argv) {
     char buffer[RECEIVING_STREAM_BUFFER_SIZE];
     int buffer_ocupied;
     buffer_ocupied = recv(data_socket, buffer,
-                          sizeof(char) * (RECEIVING_STREAM_BUFFER_SIZE - 1), 0);
+                          sizeof(char) * RECEIVING_STREAM_BUFFER_SIZE, 0);
     if (buffer_ocupied == -1) {
-      fprintf(stderr, "Issues while receving awnser from deamon\n");
+      fprintf(stderr, "Issues while receving anwser from deamon\n");
       return -1;
-    }
-    if (buffer[buffer_ocupied - 1] == EOF) {
+    } else if (buffer_ocupied > 0) {
+      fwrite(buffer, sizeof(char), buffer_ocupied, stdout);
+      fflush(stdout);
+    } else {
       received_it_all = 1;
-      buffer_ocupied--; // Dont fwrite the EOF
     }
-    fwrite(buffer, sizeof(char), buffer_ocupied, stdout);
-    fflush(stdout);
   }
   // Closing socket and exiting
   close(data_socket);
