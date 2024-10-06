@@ -36,8 +36,9 @@ int read_ipc_socket_string(SOCKET ipc_client, char **string) {
       strcpy(_string, tmp);
     r = read(ipc_client, &_string[string_size - r],
              sizeof(char) * (strlen(buffer) + 1));
-    // we got to the '\0' in the stream, stop reading
-    if (strlen(buffer) + 1 == r) {
+    // we got to the '\0' in the stream (aka, the \0 is not the one added at the
+    // end of the buffer), stop reading
+    if (strlen(buffer) < (sizeof(buffer) - 1)) {
       break;
     }
     if (tmp != NULL)
