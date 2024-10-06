@@ -76,15 +76,15 @@ Os comandos possíveis no `client` são:
 
 #### Não consigo conectar mesmo estando em uma rede local
 
-Confira se os ports TCP que voce esta usando estao habilitados para receberem conexoes no firewall de sua maquina.
+Confira se os ports TCP que você esta usando estão habilitados para receberem conexões no firewall de sua máquina.
 
 #### Ele não envia o arquivo com nome muito grande
 
-Por algum  motivo, quando o nome do arquivo e muito extenso, ele pode acabar tendo alguns caracteres trocados, então se limite a nome de arquivos pequenos.
+Por algum motivo, quando o nome do arquivo é muito extenso, ele pode acabar tendo alguns caracteres trocados, então se limite a nome de arquivos pequenos.
 
 #### Ele não envia o arquivo muito grandes
 
-Arquivos muito grandes não conseguem ser enviados, mas arquivos abaixo de 40KB com grande certeza conseguem ser enviados.
+Arquivos muito grandes não conseguem ser enviados, então se limite a arquivos menores que 40KB.
 
 
 
