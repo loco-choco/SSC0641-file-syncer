@@ -21,17 +21,13 @@ void *syncee_init(SYNCEE_ARGS *args) {
   SOCKET server;
   struct sockaddr_in server_addr_in;
   SOCKET ipc_client = args->ipc_client;
-  char end_ipc_connection = EOF;
   printf("Syncee thread created.\n");
 
   // Create Client Socket and Connect it to Server
   server = socket(AF_INET, SOCK_STREAM, 0);
   if (server < 0) {
     fprintf(stderr, "Wasn't able to create client socket.\n");
-    send(ipc_client, &end_ipc_connection, sizeof(char), 0);
-    free(args->server_addr);
-    free(args);
-    return 0;
+    goto CLOSE_FREE_AND_EXIT;
   }
   server_addr_in.sin_family = args->ip_type;
   server_addr_in.sin_port = htons(args->port);
@@ -39,10 +35,7 @@ void *syncee_init(SYNCEE_ARGS *args) {
   if (inet_pton(args->ip_type, args->server_addr, &server_addr_in.sin_addr) <=
       0) {
     fprintf(stderr, "Invalid address %s\n", args->server_addr);
-    send(ipc_client, &end_ipc_connection, sizeof(char), 0);
-    free(args->server_addr);
-    free(args);
-    return 0;
+    goto CLOSE_FREE_AND_EXIT;
   }
   // Conect to server
   printf("Conecting to server in %s.\n", args->server_addr);
@@ -50,7 +43,6 @@ void *syncee_init(SYNCEE_ARGS *args) {
               sizeof(server_addr_in)) < 0) {
     fprintf(stderr, "Wasn't able to connect to server in %s.\n",
             args->server_addr);
-    send(ipc_client, &end_ipc_connection, sizeof(char), 0);
     goto CLOSE_FREE_AND_EXIT;
   }
 
@@ -104,14 +96,17 @@ int get_file_table_for_ipc(SOCKET server, SOCKET ipc_client) {
   while (received_it_all == 0) {
     received_amount = recv(server, &separator_read, sizeof(char), 0);
     if (received_amount < sizeof(char)) {
-      fprintf(stderr, "Error receiving Separator from server.\n");
+      fprintf(stderr, "Error receiving separator from server.\n");
+      break;
     }
     if (separator_read == FILE_TABLE_STRING_SEPARATOR) {
       int status = read_string_from_socket(server, &file_name_string);
       if (status == -1) {
         fprintf(stderr, "Error receiving string size from server.\n");
+        break;
       } else if (status == -2) {
         fprintf(stderr, "Error receiving string from server.\n");
+        break;
       }
 
       // Send request back to IPC client
@@ -133,10 +128,6 @@ int get_file_table_for_ipc(SOCKET server, SOCKET ipc_client) {
       fprintf(stderr, "Received wrong separator.\n");
     }
   }
-  // Send end of request as EOF, just like when fetching file content
-  char eof = EOF;
-  send(ipc_client, &eof, sizeof(char), 0);
-
   return 0;
 }
 int get_file_contents_for_ipc(SOCKET server, char *file, SOCKET ipc_client) {
