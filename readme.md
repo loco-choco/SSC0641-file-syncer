@@ -72,6 +72,23 @@ Os comandos possíveis no `client` são:
 
 **Atenção!** Caso seja colocado argumentos de mais no `client`, ele trava por esperar que o servidor vá ler esses argumentos, mesmo que o servidor já tenha fechado a conexão com `client`. Isso ocorre pelo IPC ocorrer por um arquivo de socket de _Unix Domain Sockets_.
 
+### Possiveis problemas
+
+#### Não consigo conectar mesmo estando em uma rede local
+
+Confira se os ports TCP que voce esta usando estao habilitados para receberem conexoes no firewall de sua maquina.
+
+#### Ele não envia o arquivo com nome muito grande
+
+Por algum  motivo, quando o nome do arquivo e muito extenso, ele pode acabar tendo alguns caracteres trocados, então se limite a nome de arquivos pequenos.
+
+#### Ele não envia o arquivo muito grandes
+
+Arquivos muito grandes não conseguem ser enviados, mas arquivos abaixo de 40KB com grande certeza conseguem ser enviados.
+
+
+
+
 
 
 
