@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define RECEIVE_FILE_BUFFER_SIZE 512
+#define RECEIVE_FILE_BUFFER_SIZE 1024
 
 typedef int SOCKET;
 

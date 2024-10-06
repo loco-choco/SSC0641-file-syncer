@@ -250,7 +250,7 @@ void send_file_content(SOCKET client, FILE_TABLE *files, char *dir,
       size_t read_bytes;
       while ((read_bytes = fread(buffer, sizeof(char), MAX_SENDING_BUFFER_SIZE,
                                  file_handler)) > 0) {
-        send(client, buffer, sizeof(char) * read_bytes, MSG_MORE);
+        send(client, buffer, sizeof(char) * read_bytes, 0);
       }
       fclose(file_handler);
     } else {
