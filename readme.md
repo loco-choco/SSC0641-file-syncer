@@ -78,14 +78,13 @@ Os comandos possíveis no `client` são:
 
 Confira se os ports TCP que você esta usando estão habilitados para receberem conexões no firewall de sua máquina.
 
-#### Ele não envia o arquivo com nome muito grande
+#### O _daemon_ não faz _bind_ com a porta que eu solicitei
 
-Por algum motivo, quando o nome do arquivo é muito extenso, ele pode acabar tendo alguns caracteres trocados, então se limite a nome de arquivos pequenos.
+Isso ocorre quando o `daemon` não é fechado de forma limpa, espere alguns minutos ou tente outra porta.
 
-#### Ele não envia o arquivo muito grandes
+### Bugs Conhecidos
 
-Arquivos muito grandes não conseguem ser enviados, então se limite a arquivos menores que 40KB.
-
+- Quando o `client` falha em passar os dados para frente em um _pipe_, o erro de conexão pode fazer com que o `deamon` crashe.
 
 
 
