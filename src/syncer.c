@@ -19,6 +19,7 @@ typedef int SOCKET;
 typedef struct syncer_receiver_args {
   SOCKET socket;
   FILE_TABLE *files;
+  char *dir;
   pthread_mutex_t *files_mutex;
 } SYNCER_RECEIVER_ARGS;
 
@@ -29,7 +30,7 @@ typedef struct thread_list {
 
 void *syncer_receiver(SYNCER_RECEIVER_ARGS *args);
 void send_file_table(SOCKET client, FILE_TABLE *files);
-void send_file_content(SOCKET client, char *file);
+void send_file_content(SOCKET client, FILE_TABLE *files, char *dir, char *file);
 
 void *syncer_init(SYNCER_ARGS *args) {
   SOCKET listener;
@@ -91,18 +92,19 @@ void *syncer_init(SYNCER_ARGS *args) {
     printf("New conection from %s.\n", client_addr.sa_data);
     // Give new socket to client thread
     pthread_t client_thread;
-    SYNCER_RECEIVER_ARGS *args = calloc(1, sizeof(SYNCER_RECEIVER_ARGS));
-    args->files = files;
-    args->files_mutex = &files_mutex;
-    args->socket = client;
-    pthread_create(&client_thread, NULL, (void *)syncer_receiver, args);
+    SYNCER_RECEIVER_ARGS *receiver_args =
+        calloc(1, sizeof(SYNCER_RECEIVER_ARGS));
+    receiver_args->files = files;
+    receiver_args->dir = args->dir;
+    receiver_args->files_mutex = &files_mutex;
+    receiver_args->socket = client;
+    pthread_create(&client_thread, NULL, (void *)syncer_receiver,
+                   receiver_args);
     // Add new thread to list
     THREAD_LIST *new = calloc(1, sizeof(THREAD_LIST));
     new->thread = client_thread;
     new->next = client_threads;
     client_threads = new;
-
-    // TODO FIND A WAY TO CLOSE SERVER
   }
   printf("Closing Listener Socket.\n");
   // Close listening socket
@@ -133,6 +135,7 @@ void *syncer_init(SYNCER_ARGS *args) {
 void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
   SOCKET client = args->socket;
   FILE_TABLE *file_table = args->files;
+  char *dir = args->dir;
   pthread_mutex_t *files_mutex = args->files_mutex;
 
   printf("New syncer receiver thread.\n");
@@ -170,7 +173,7 @@ void *syncer_receiver(SYNCER_RECEIVER_ARGS *args) {
         continue;
       }
       // Send file contents
-      send_file_content(client, file_name);
+      send_file_content(client, file_table, dir, file_name);
     }
   }
 
@@ -213,28 +216,48 @@ void send_file_table(SOCKET client, FILE_TABLE *files) {
 // HEADER (FILE_CONTENT_REQUEST)
 // FILE CONTENT
 // EOF
-void send_file_content(SOCKET client, char *file) {
+void send_file_content(SOCKET client, FILE_TABLE *files, char *dir,
+                       char *file) {
   char buffer[MAX_SENDING_BUFFER_SIZE];
   char header = FILE_CONTENT_REQUEST;
   char message_end = FILE_CONTENT_MESSAGE_END;
   FILE *file_handler;
 
-  printf("Sending contents of file '%s' to client.\n", file);
+  int file_in_table = 0;
+  FILE_TABLE *pointer;
+  pointer = files;
+  while (pointer != NULL && file_in_table == 0) {
+    if (strcmp(pointer->file, file) == 0)
+      file_in_table = 1;
+    pointer = pointer->next;
+  }
+  if (file_in_table == 1)
+    printf("Sending contents of file '%s' to client.\n", file);
+  else
+    printf("File '%s' doesnt exist in table, sending blank.\n", file);
 
   // Send Header
   send(client, &header, sizeof(header), MSG_MORE);
   // Send File
-  file_handler = fopen(file, "r");
-  if (file_handler != NULL) {
-    size_t read_bytes;
-    while ((read_bytes = fread(buffer, sizeof(char), MAX_SENDING_BUFFER_SIZE,
-                               file_handler)) > 0) {
-      send(client, buffer, sizeof(char) * read_bytes, MSG_MORE);
+  if (file_in_table) {
+    char *file_path = calloc(strlen(dir) + 1 + strlen(file) + 1, sizeof(char));
+    strcat(file_path, dir);
+    strcat(file_path, "/");
+    strcat(file_path, file);
+    printf("Opening file %s.\n", file_path);
+    file_handler = fopen(file_path, "r");
+    if (file_handler != NULL) {
+      size_t read_bytes;
+      while ((read_bytes = fread(buffer, sizeof(char), MAX_SENDING_BUFFER_SIZE,
+                                 file_handler)) > 0) {
+        send(client, buffer, sizeof(char) * read_bytes, MSG_MORE);
+      }
+      fclose(file_handler);
+    } else {
+      fprintf(stderr,
+              "Failed to open file %s, returning empty bytes to client.\n",
+              file);
     }
-    fclose(file_handler);
-  } else {
-    fprintf(stderr,
-            "Failed to open file %s, returning empty bytes to client.\n", file);
   }
   // Send end of Messgae
   send(client, &message_end, sizeof(char), 0);
