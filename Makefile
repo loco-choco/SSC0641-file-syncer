@@ -7,7 +7,7 @@ server:
 	gcc src/ipc-connection-definition.c -I include/ -o out/ipc-connection-definition.o -c
 	gcc src/syncee.c -I include/ -o out/syncee.o -c
 	gcc src/syncer.c -I include/ -o out/syncer.o -c
-	gcc src/main.c out/file-table.o out/message-definition.o out/ipc-connection-definition.o out/syncee.o out/syncer.o -I include/ -o out/deamon
+	gcc src/main.c out/file-table.o out/message-definition.o out/ipc-connection-definition.o out/syncee.o out/syncer.o -I include/ -o out/daemon
 client:
 	gcc src/message-definition.c -I include/ -o out/message-definition.o -c
 	gcc src/ipc-connection-definition.c -I include/ -o out/ipc-connection-definition.o -c
