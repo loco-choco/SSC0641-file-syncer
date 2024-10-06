@@ -8,12 +8,13 @@
 typedef int SOCKET;
 int read_ipc_socket_string(SOCKET ipc_client, char **string) {
   char buffer[20];
-  int r, received;
+  int reached_the_end = 0;
+  int r, received_chars;
   char *tmp = NULL;
   char *_string;
-  while (1) {
-    received = recv(ipc_client, &buffer, sizeof(buffer) - 1, MSG_PEEK);
-    if (received == -1) {
+  while (reached_the_end == 0) {
+    r = recv(ipc_client, &buffer, sizeof(buffer) - 1, MSG_PEEK);
+    if (r == -1) {
       if (_string != NULL)
         free(_string);
       if (tmp != NULL)
@@ -27,23 +28,27 @@ int read_ipc_socket_string(SOCKET ipc_client, char **string) {
     // if we read the '\0' from peek (when strlen < sizeof(buffer) - 1), or if
     // there is more on the stream to read (strlen == sizeof(buffer) - 1).
     buffer[sizeof(buffer) - 1] = '\0';
-    int string_size = received;
+    received_chars = strlen(buffer);
+    // If this buffer has a \0 that isnt the one added to the end of it, this
+    // means that we found the end of the string being sent
+    if (received_chars < (sizeof(buffer) - 1)) {
+      received_chars++;    // so we need to read the contents + the \0
+      reached_the_end = 1; // and mark that we reached the end
+    }
+    int string_size = received_chars;
     if (tmp != NULL)
       string_size += strlen(tmp);
-    _string = malloc(sizeof(char) * (string_size + 1));
-
+    _string = calloc(string_size + 1, sizeof(char));
     if (tmp != NULL)
       strcpy(_string, tmp);
-    r = read(ipc_client, &_string[string_size - received],
-             sizeof(char) * (strlen(buffer) + 1));
-    // we got to the '\0' in the stream (aka, the \0 is not the one added at the
-    // end of the buffer), stop reading
-    if (strlen(buffer) < (sizeof(buffer) - 1)) {
-      break;
+    r = read(ipc_client, &_string[string_size - received_chars],
+             sizeof(char) * received_chars);
+
+    if (reached_the_end == 0) {
+      if (tmp != NULL)
+        free(tmp);
+      tmp = _string; // current string is the prefix from the next iteration
     }
-    if (tmp != NULL)
-      free(tmp);
-    tmp = _string; // current string is the prefix from the next iteration
   }
 
   *string = _string;
