@@ -91,8 +91,6 @@ int main(int argc, char **argv) {
       fprintf(stderr, "Failed to accept client from  IPC socket.\n");
       exit(EXIT_FAILURE);
     }
-    // TODO FIX READING SO IT DOESNT END UP READING THE WHOLE INPUT IN THE
-    // BUFFER MAKE IT STOP IN \0
     char end_connection = EOF; // Var to hold a EOF if we need to end a
                                // connection to the IPC client
     int end = 0;
