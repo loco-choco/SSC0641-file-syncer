@@ -69,9 +69,15 @@ int main(int argc, char **argv) {
   }
 
   // Create syncer_init thread
+  int close_server;
+  pthread_mutex_t close_server_mutex;
+  pthread_mutex_init(&close_server_mutex, NULL);
   SYNCER_ARGS *syncer_args = calloc(1, sizeof(SYNCER_ARGS));
   syncer_args->port = port;
   syncer_args->dir = calloc(strlen(dir) + 1, sizeof(char));
+  syncer_args->close_server = &close_server;
+  syncer_args->close_server_mutex = &close_server_mutex;
+
   strcpy(syncer_args->dir, dir);
   pthread_create(&syncer_thread, NULL, (void *)syncer_init, syncer_args);
 
@@ -179,10 +185,15 @@ int main(int argc, char **argv) {
       break;
     }
   }
-  printf("Exiting program.\n");
 
   // Waiting for server to close
-  // pthread_join(syncer_thread, NULL);
+  pthread_mutex_lock(close_server_mutex);
+  close_server = 1;
+  pthread_mutex_unlock(close_server_mutex);
+  printf("Waiting syncer thread to stop.\n");
+  pthread_join(syncer_thread, NULL);
+  pthread_mutex_destroy(&close_server_mutex);
+  printf("Exiting program.\n");
   // Closing IPC socket
   close(connection_socket);
   // Removing tmp socket file

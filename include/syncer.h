@@ -3,6 +3,8 @@
 typedef struct syncer_args {
   int port;
   char *dir;
+  int *close_server;
+  pthread_mutex_t *close_server_mutex;
 } SYNCER_ARGS;
 
 void *syncer_init(SYNCER_ARGS *args);

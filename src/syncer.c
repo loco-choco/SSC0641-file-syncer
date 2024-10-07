@@ -88,8 +88,10 @@ void *syncer_init(SYNCER_ARGS *args) {
   poll_fds.events = POLLIN;
   // Wait for new conections
   printf("Waiting for new conections.\n");
-  int close_server = 0;
-  while (close_server == 0) {
+  int _close_server = 0;
+  int *close_server = args->close_server;
+  pthread_mutex_t *close_server_mutex = args->close_server_mutex;
+  while (_close_server == 0) {
     SOCKET client;
     struct sockaddr client_addr;
     socklen_t client_addr_len;
@@ -103,6 +105,9 @@ void *syncer_init(SYNCER_ARGS *args) {
       break;
     }
     if (rc == 0) { // Just a timeout
+      pthread_mutex_lock(close_server_mutex);
+      _close_server = *close_server;
+      pthread_mutex_unlock(close_server_mutex);
       continue;
     }
     client = accept(listener, &client_addr, &client_addr_len);
