@@ -187,9 +187,9 @@ int main(int argc, char **argv) {
   }
 
   // Waiting for server to close
-  pthread_mutex_lock(close_server_mutex);
+  pthread_mutex_lock(&close_server_mutex);
   close_server = 1;
-  pthread_mutex_unlock(close_server_mutex);
+  pthread_mutex_unlock(&close_server_mutex);
   printf("Waiting syncer thread to stop.\n");
   pthread_join(syncer_thread, NULL);
   pthread_mutex_destroy(&close_server_mutex);

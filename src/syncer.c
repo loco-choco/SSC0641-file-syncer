@@ -90,7 +90,6 @@ void *syncer_init(SYNCER_ARGS *args) {
   printf("Waiting for new conections.\n");
   int _close_server = 0;
   int *close_server = args->close_server;
-  pthread_mutex_t *close_server_mutex = args->close_server_mutex;
   while (_close_server == 0) {
     SOCKET client;
     struct sockaddr client_addr;
@@ -105,9 +104,9 @@ void *syncer_init(SYNCER_ARGS *args) {
       break;
     }
     if (rc == 0) { // Just a timeout
-      pthread_mutex_lock(close_server_mutex);
+      pthread_mutex_lock(args->close_server_mutex);
       _close_server = *close_server;
-      pthread_mutex_unlock(close_server_mutex);
+      pthread_mutex_unlock(args->close_server_mutex);
       continue;
     }
     client = accept(listener, &client_addr, &client_addr_len);

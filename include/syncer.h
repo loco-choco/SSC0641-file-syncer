@@ -1,3 +1,6 @@
+#include <pthread.h>
+#include <sys/types.h>
+
 #ifndef SYNCER_H
 #define SYNCER_H
 typedef struct syncer_args {
