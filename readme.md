@@ -26,6 +26,9 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 A partir do código-fonte, são gerados dois executáveis, o que faz a transferencia de arquivos e aceita pedidos dos usuários em uma máquina (o _daemon_),
 e o que permite com que um usuário interaja com o _deamon_ por IPC (o _client_).
 
+### Video de Demonstracao
+[![Video](https://img.youtube.com/vi/Kfxpb1e634c/0.jpg)](https://www.youtube.com/watch?v=Kfxpb1e634c)
+
 ### Como Compilar
 
 Para compilar, será necessário ter a ferramenta de terminal `make`. Com ela, rode o seguinte comando dentro do início da pasta principal do repositório:
