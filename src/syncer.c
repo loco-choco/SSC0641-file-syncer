@@ -8,13 +8,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ioctl.h>
+#include <sys/poll.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
 
 #define MAX_PENDING_CONECTIONS 10
 #define MAX_RECEIVER_BUFFER_SIZE 128
 #define MAX_SENDING_BUFFER_SIZE 1024
+#define ACCEPT_LOOP_TIMEOUT 100
 
 typedef int SOCKET;
 typedef struct syncer_receiver_args {
@@ -39,12 +43,12 @@ void *syncer_init(SYNCER_ARGS *args) {
   FILE_TABLE *files;
   pthread_mutex_t files_mutex;
   THREAD_LIST *client_threads;
-
+  struct pollfd poll_fds;
   printf("Syncer thread created.\n");
 
   printf("Creating Listener Socket.\n");
   // Create Listener Socket and Bind it to Port
-  listener = socket(AF_INET, SOCK_STREAM, 0);
+  listener = socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
   if (listener < 0) {
     fprintf(stderr, "Wasn't able to create listener socket.\n");
     free(args);
@@ -78,16 +82,37 @@ void *syncer_init(SYNCER_ARGS *args) {
   pthread_mutex_init(&files_mutex, NULL);
   // Initialize the client_threads list
   client_threads = NULL;
+  // Create the Pool for accepts
+
+  poll_fds.fd = listener;
+  poll_fds.events = POLLIN;
   // Wait for new conections
   printf("Waiting for new conections.\n");
-  while (1) {
+  int close_server = 0;
+  while (close_server == 0) {
     SOCKET client;
     struct sockaddr client_addr;
     socklen_t client_addr_len;
     // Wait for new connections
+    int rc = poll(&poll_fds, 1, ACCEPT_LOOP_TIMEOUT);
+    if (rc < 0) {
+      char *error = malloc(sizeof(char) * 50);
+      strerror_r(errno, error, 50);
+      fprintf(stderr, "Pooling failed: %s.\n", error);
+      free(error);
+      break;
+    }
+    if (rc == 0) { // Just a timeout
+      continue;
+    }
     client = accept(listener, &client_addr, &client_addr_len);
     if (client < 0) {
-      fprintf(stderr, "Accepting conection of client failed.\n");
+      if (errno != EWOULDBLOCK || errno != EAGAIN) {
+        char *error = malloc(sizeof(char) * 50);
+        strerror_r(errno, error, 50);
+        fprintf(stderr, "Accepting conection of client failed: %s.\n", error);
+        free(error);
+      }
       continue;
     }
     char client_ip[INET_ADDRSTRLEN];
